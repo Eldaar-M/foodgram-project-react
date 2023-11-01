@@ -1,12 +1,12 @@
 from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 User = get_user_model()
 
 
 class Ingredient(models.Model):
-    name = models.CharField('Название ингредиента')
+    name = models.CharField('Название ингредиента', max_length=64)
     measurement_unit = models.CharField('Единица измерения', max_length=32)
 
     class Meta():
@@ -18,9 +18,19 @@ class Ingredient(models.Model):
 
 
 class Tag(models.Model):
-    name = models.CharField('Тег', max_length=20)
-    color = models.CharField(max_length=16)
+    name = models.CharField('Тег', unique=True, max_length=32)
     slug = models.SlugField(unique=True)
+    color = models.CharField(
+        max_length=50,
+        unique=True,
+        required=True,
+        validators=[
+            RegexValidator(
+                regex=r'^[#](\w+)$',
+                message='Тег не соответствует требованиям',
+            ),
+        ]
+    )
 
     class Meta():
         verbose_name = 'Тег'
@@ -53,15 +63,18 @@ class Recipe(models.Model):
     text = models.TextField(
         'Текстовое описание',
         help_text='Напишите описание рецепта')
-    ingredients = models.ManyToManyField(Ingredient,
-                                         related_name='recipes',
-                                         verbose_name='Теги',
-                                         through='RecipeIngredient')
+    ingredients = models.ManyToManyField(
+        Ingredient,
+        related_name='recipes',
+        verbose_name='Теги',
+        through='RecipeIngredient'
+    )
     tags = models.ManyToManyField(
         Tag,
         related_name='recipes',
         verbose_name='Теги',
-        through='RecipeIngredient')
+        through='RecipeTag'
+    )
     cooking_time = models.PositiveIntegerField(
         validators=[
             MinValueValidator(
@@ -69,6 +82,9 @@ class Recipe(models.Model):
                 )
         ]
     )
+    pub_date = models.DateTimeField(
+        'Дата публикации',
+        auto_now_add=True)
 
     class Meta():
         verbose_name = 'Рецепт'
@@ -144,7 +160,7 @@ class Favourite(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
-                name='unique_favorites'
+                name='unique_favourites'
             )
         ]
 
