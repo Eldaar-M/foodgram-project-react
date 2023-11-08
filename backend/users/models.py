@@ -7,17 +7,16 @@ class User(AbstractUser):
     email = models.EmailField(
         'Email',
         max_length=200,
-        unique=True,)
+        unique=True,
+    )
     username = models.CharField(
         'Юзернейм',
         max_length=150,
         unique=True,
-        validators=[
-            RegexValidator(
-                regex=r'^[\w.@+-]+\z',
-                message='Юзернейм не соответствует требованиям',
-            ),
-        ]
+        validators=[RegexValidator(
+            regex=r'^[\w.@+-]+$',
+            message='Недопустимый символ'
+        )]
     )
     first_name = models.CharField(
         'Имя',
@@ -27,14 +26,20 @@ class User(AbstractUser):
         'Фамилия',
         max_length=150
     )
+    password = models.CharField(
+        'Пароль',
+        max_length=150
+    )
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = (
+        'username',
+        'first_name',
+        'last_name'
+    )
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['email', 'username'],
-                name='unique_email_username'
-            )
-        ]
+        ordering = ('id',)
 
     def __str__(self):
         return self.username

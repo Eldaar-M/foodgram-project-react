@@ -21,15 +21,8 @@ class Tag(models.Model):
     name = models.CharField('Тег', unique=True, max_length=32)
     slug = models.SlugField(unique=True)
     color = models.CharField(
-        max_length=50,
+        max_length=16,
         unique=True,
-        required=True,
-        validators=[
-            RegexValidator(
-                regex=r'^[#](\w+)$',
-                message='Тег не соответствует требованиям',
-            ),
-        ]
     )
 
     class Meta():
