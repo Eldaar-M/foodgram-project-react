@@ -242,10 +242,6 @@ class RecipePostSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         ingredients = attrs.get('ingredients')
-        if not ingredients:
-            raise serializers.ValidationError(
-                'Минимальное число ингредиентов: 1'
-            )
         unique_ingredients = []
         for ingredient in ingredients:
             ing = get_object_or_404(Ingredient, id=ingredient.get('id'))
@@ -254,20 +250,24 @@ class RecipePostSerializer(serializers.ModelSerializer):
                     'Нельзя добавлять один и тот же ингредиент!'
                 )
             unique_ingredients.append(ing)
+        if not ingredients:
+            raise serializers.ValidationError(
+                'Минимальное число ингредиентов: 1'
+            )
         return attrs
 
     def validate_tags(self, tags):
         unique_tags = []
-        if not tags:
-            raise serializers.ValidationError(
-                'Минимальное число тегов: 1'
-            )
         for tag in tags:
             if tag in unique_tags:
                 raise serializers.ValidationError(
                     'Нельзя добавлять один и тот же тег!'
                 )
             unique_tags.append(tag)
+        if not tags:
+            raise serializers.ValidationError(
+                'Минимальное число тегов: 1'
+            )
         return tags
 
     def add_ingredients(self, ingredients, recipe):
