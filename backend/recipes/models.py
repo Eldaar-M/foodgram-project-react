@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.core.validators import MinValueValidator, RegexValidator
+from django.core.validators import MinValueValidator
 from django.db import models
 
 User = get_user_model()
+
+MIN_VALUE_VALID = 1
 
 
 class Ingredient(models.Model):
@@ -71,8 +73,8 @@ class Recipe(models.Model):
     cooking_time = models.PositiveIntegerField(
         validators=[
             MinValueValidator(
-                1, message='Время приготовления от 1 минуты'
-                )
+                MIN_VALUE_VALID, message='Время приготовления от 1 минуты'
+            )
         ]
     )
     pub_date = models.DateTimeField(
@@ -94,9 +96,20 @@ class RecipeTag(models.Model):
 
 
 class RecipeIngredient(models.Model):
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
-    count = models.PositiveIntegerField()
+    ingredient = models.ForeignKey(
+        Ingredient,
+        on_delete=models.CASCADE,
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='recipe_ingredients'
+    )
+    amount = models.PositiveIntegerField(
+        validators=[
+            MinValueValidator(
+                MIN_VALUE_VALID,
+                message='Количество ингредиента не может быть нулевым')])
 
 
 class Subscribe(models.Model):
