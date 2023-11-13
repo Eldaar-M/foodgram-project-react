@@ -8,40 +8,43 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import (AllowAny,
-                                        IsAuthenticatedOrReadOnly,
-                                        IsAuthenticated
-                                        )
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticatedOrReadOnly,
+    IsAuthenticated
+)
 from rest_framework.viewsets import ModelViewSet
 
 
 from .filters import IngredientSearchFilter, RecipeFilter
-from .serializers import (IngredientSerializer,
-                          RecipeSerializer,
-                          RecipeFavouriteSerializer,
-                          RecipePostSerializer,
-                          SubscribeModelSerializer,
-                          SubscribeUserSerializer,
-                          TagSerializer,
-                          CustomUserSerializer,
-                          )
-from .permissions import AuthorOrReadOnly, AuthenticatedOrAnonymousReadOnly
-from recipes.models import (Favourite,
-                            Ingredient,
-                            Recipe,
-                            RecipeIngredient,
-                            Subscribe,
-                            ShoppingCart,
-                            Tag,
-                            )
+from .serializers import (
+    IngredientSerializer,
+    RecipeSerializer,
+    RecipeFavouriteSerializer,
+    RecipePostSerializer,
+    SubscribeModelSerializer,
+    SubscribeUserSerializer,
+    TagSerializer,
+    UserSerializer,
+)
+from .permissions import AuthorOrReadOnly, AdminOrReadOnly
+from recipes.models import (
+    Favourite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    Subscribe,
+    ShoppingCart,
+    Tag,
+)
 
 User = get_user_model()
 
 
-class CustomUserViewSet(UserViewSet):
+class UserViewSet(UserViewSet):
     queryset = User.objects.all()
-    serializer_class = CustomUserSerializer
-    permission_classes = (AuthenticatedOrAnonymousReadOnly,)
+    serializer_class = UserSerializer
+    permission_classes = (AdminOrReadOnly,)
 
     @action(methods=['get'], detail=False)
     def subscriptions(self, request):
@@ -65,12 +68,12 @@ class CustomUserViewSet(UserViewSet):
             )
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            resonse_serializer = SubscribeUserSerializer(
+            response_serializer = SubscribeUserSerializer(
                 author,
                 context={'request': request}
             )
             return Response(
-                resonse_serializer.data, status=status.HTTP_201_CREATED
+                response_serializer.data, status=status.HTTP_201_CREATED
             )
         get_object_or_404(Subscribe,
                           user=request.user,

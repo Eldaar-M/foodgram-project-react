@@ -7,15 +7,16 @@ from djoser.serializers import UserCreateSerializer, UserSerializer
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
-from recipes.models import (Favourite,
-                            Ingredient,
-                            Recipe,
-                            RecipeTag,
-                            RecipeIngredient,
-                            Subscribe,
-                            ShoppingCart,
-                            Tag
-                            )
+from recipes.models import (
+    Favourite,
+    Ingredient,
+    Recipe,
+    RecipeTag,
+    RecipeIngredient,
+    Subscribe,
+    ShoppingCart,
+    Tag
+)
 
 User = get_user_model()
 
@@ -52,7 +53,7 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class SubscribeRecipeSerializer(serializers.ModelSerializer):
+class GetRecipesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Recipe
@@ -96,22 +97,24 @@ class SubscribeUserSerializer(serializers.ModelSerializer):
             'recipes_count'
         )
 
-    def get_is_subscribed(self, obj):
-        return obj.following.filter(
+    def get_is_subscribed(self, user):
+        return user.following.filter( 
             user=self.context.get('request').user
         ).exists()
 
-    def get_recipes(self, obj):
+    def get_recipes(self, user):
         recipes_limit = self.context.get(
-            'request').query_params.get('recipes_limit')
-        recipes = obj.recipes.all()[:recipes_limit]
-        return SubscribeRecipeSerializer(recipes, many=True).data
+            'request'
+        ).GET.get('recipes_limit', 10**10)
+        if recipes_limit:
+            recipes = user.recipes.all()[:recipes_limit] 
+        return GetRecipesSerializer(recipes, many=True).data
 
     def get_recipes_count(self, obj):
         return obj.recipes.count()
 
 
-class CustomUserSerializer(UserSerializer):
+class UserSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -125,25 +128,11 @@ class CustomUserSerializer(UserSerializer):
             'is_subscribed',
         )
 
-    def get_is_subscribed(self, obj):
+    def get_is_subscribed(self, user):
         request = self.context.get('request')
         if request.user.is_anonymous:
             return False
-        return obj.following.filter(user=request.user).exists()
-
-
-class CustomUserPostSerializer(UserCreateSerializer):
-
-    class Meta:
-        model = User
-        fields = (
-            'id',
-            'email',
-            'username',
-            'first_name',
-            'last_name',
-            'password',
-        )
+        return user.following.filter(user=request.user).exists()
 
 
 class IngredientSerializer(serializers.ModelSerializer):
@@ -155,7 +144,6 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ingredient.id')
-    amount = serializers.IntegerField()
     name = serializers.ReadOnlyField(source='ingredient.name')
     measurement_unit = serializers.ReadOnlyField(
         source='ingredient.measurement_unit'
@@ -192,7 +180,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     )
     tags = TagSerializer(many=True, read_only=True)
     image = Base64ImageField(required=False, allow_null=True)
-    author = CustomUserSerializer(read_only=True)
+    author = UserSerializer(read_only=True)
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
 
@@ -225,7 +213,7 @@ class RecipePostSerializer(serializers.ModelSerializer):
     )
     ingredients = RecipeIngredientShortSerializer(many=True)
     image = Base64ImageField(required=False, allow_null=True)
-    author = CustomUserSerializer(read_only=True)
+    author = UserSerializer(read_only=True)
 
     class Meta:
         model = Recipe
