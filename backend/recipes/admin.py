@@ -19,7 +19,7 @@ LIST_PER_PAGE = 6
 
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(admin.UserAdmin):
     """Класс настройки раздела пользователей."""
 
     list_display = (
@@ -29,14 +29,25 @@ class UserAdmin(admin.ModelAdmin):
         'first_name',
         'last_name',
         'password',
+        'follower_count',
+        'following_count',
+        'recipes_count'
     )
     list_filter = ('username', 'email')
     list_per_page = LIST_PER_PAGE
     search_fields = ('username',)
 
+    @admin.display(description='Число подписчиков')
+    def follower_count(self, user):
+        return user.follower.count()
 
-admin.site.unregister(Group)
-admin.site.unregister(TokenProxy)
+    @admin.display(description='Число подписок')
+    def following_count(self, user):
+        return user.following.count()
+
+    @admin.display(description='Число рецептов')
+    def recipes_count(self, user):
+        return user.recipes.count()
 
 
 @admin.register(Tag)
@@ -139,3 +150,7 @@ class ShoppingCartAdmin(admin.ModelAdmin):
     list_filter = ('user',)
     search_fields = ('user',)
     list_per_page = LIST_PER_PAGE
+
+
+admin.site.register(User, UserAdmin)
+admin.site.unregister(Group)
