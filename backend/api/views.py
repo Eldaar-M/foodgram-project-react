@@ -1,3 +1,5 @@
+import datetime
+
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.http import FileResponse
@@ -20,14 +22,17 @@ from .filters import IngredientSearchFilter, RecipeFilter
 from .serializers import (
     IngredientSerializer,
     RecipeSerializer,
-    RecipeFavouriteSerializer,
-    RecipePostSerializer,
+    RecipeAddSerializer,
+    RecipeCreateSerializer,
     SubscribeModelSerializer,
     SubscribeUserSerializer,
+    SubscriptionSerializer,
     TagSerializer,
     UserSerializer,
 )
+from .send_file import sending
 from .permissions import AuthorOrReadOnly, AdminOrReadOnly
+from .pagination import Paginator
 from recipes.models import (
     Favourite,
     Ingredient,
@@ -46,10 +51,12 @@ class UserViewSet(UserViewSet):
     serializer_class = UserSerializer
     permission_classes = (AdminOrReadOnly,)
 
-    @action(methods=['get'], detail=False)
+    @action(methods=['get'],
+            detail=False)
     def subscriptions(self, request):
-        paginator = PageNumberPagination()
+        paginator = Paginator()
         authors = User.objects.filter(following__user=request.user)
+        # author = request.user.follower.all()
         result_page = paginator.paginate_queryset(authors, request)
         serializer = SubscribeUserSerializer(
             result_page,
@@ -95,78 +102,42 @@ class RecipeViewSet(ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'retrieve':
             return RecipeSerializer
-        return RecipePostSerializer
+        return RecipeCreateSerializer
+
+    def shopping_cart_favorite(self, model, request, pk):
+        recipe = get_object_or_404(Recipe, pk=pk)
+        if request.method == 'POST':
+            serializer = RecipeAddSerializer(recipe)
+            model.objects.get_or_create(user=request.user, recipe=recipe)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        if request.method == 'DELETE':
+            get_object_or_404(model,
+                              user=request.user,
+                              recipe=recipe).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=['post', 'delete'], detail=True)
     def favorite(self, request, pk=None):
-        recipe = get_object_or_404(Recipe, pk=pk)
-        if request.method == 'POST':
-            serializer = RecipeFavouriteSerializer(recipe)
-            if not Favourite.objects.filter(user=request.user,
-                                            recipe=recipe).exists():
-                Favourite.objects.create(user=request.user,
-                                         recipe=recipe)
-                return Response(serializer.data,
-                                status=status.HTTP_201_CREATED)
-            return Response({'errors': 'Рецепт уже есть в избранном'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        if request.method == 'DELETE' and Favourite.objects.filter(
-            user=request.user,
-            recipe=recipe
-        ).exists():
-            get_object_or_404(Favourite,
-                              user=request.user,
-                              recipe=recipe).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({'errors': 'Рецепта нет в избранном'},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return self.shopping_cart_favorite(Favourite, request, pk)
 
     @action(methods=['post', 'delete'], detail=True)
     def shopping_cart(self, request, pk=None):
-        recipe = get_object_or_404(Recipe, pk=pk)
-        if request.method == 'POST':
-            serializer = RecipeFavouriteSerializer(recipe)
-            if not ShoppingCart.objects.filter(user=request.user,
-                                               recipe=recipe).exists():
-                ShoppingCart.objects.create(user=request.user,
-                                            recipe=recipe)
-                return Response(serializer.data,
-                                status=status.HTTP_201_CREATED)
-            return Response({'errors': 'Рецепт уже есть в избранном'},
-                            status=status.HTTP_400_BAD_REQUEST)
-        if request.method == 'DELETE' and ShoppingCart.objects.filter(
-            user=request.user,
-            recipe=recipe
-        ).exists():
-            get_object_or_404(ShoppingCart,
-                              user=request.user,
-                              recipe=recipe).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({'errors': 'Рецепта нет в избранном'},
-                        status=status.HTTP_400_BAD_REQUEST)
-
-    def sending(self, ingredients):
-        text_to_print = ''
-        for ingredient in ingredients:
-            text_to_print += (
-                f"{ingredient['ingredient__name']}  - "
-                f"{ingredient['total']}"
-                f"({ingredient['ingredient__measurement_unit']})\n"
-            )
-        return FileResponse(
-            text_to_print,
-            content_type='text/plain',
-            filename='products.txt'
-        )
+        return self.shopping_cart_favorite(ShoppingCart, request, pk)
 
     @action(detail=False, permission_classes=(IsAuthenticated,))
     def download_shopping_cart(self, request):
-        ingredients = RecipeIngredient.objects.filter(
-            recipe__shopping_carts__user=request.user).values(
-            'ingredient__name',
-            'ingredient__measurement_unit'
-        ).order_by('ingredient__name').annotate(total=Sum('amount'))
-        return self.sending(ingredients)
+        ingredients = RecipeIngredient.ingredients_shopping_cart(
+            self,
+            request=request
+        )
+        return FileResponse( 
+            sending(ingredients),
+            content_type='text/plain',
+            filename='products.txt'
+        )
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):

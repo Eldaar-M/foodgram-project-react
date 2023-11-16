@@ -1,7 +1,9 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Group
-from rest_framework.authtoken.models import TokenProxy
+from django.utils.safestring import mark_safe
 
 from .models import (
     Favourite,
@@ -10,7 +12,6 @@ from .models import (
     RecipeIngredient,
     ShoppingCart,
     Tag,
-    RecipeTag
 )
 
 User = get_user_model()
@@ -18,8 +19,7 @@ User = get_user_model()
 LIST_PER_PAGE = 6
 
 
-@admin.register(User)
-class UserAdmin(admin.UserAdmin):
+class UserAdmin(UserAdmin):
     """Класс настройки раздела пользователей."""
 
     list_display = (
@@ -56,8 +56,16 @@ class TagAdmin(admin.ModelAdmin):
         'pk',
         'name',
         'color',
-        'slug'
+        'slug',
+        'preview'
     )
+
+    @admin.display(description='Предпросмотр')
+    def preview(self, tag):
+        return mark_safe(
+            f'<span style="color:{tag.color}; '
+            f'width=20px; height=20px;">{tag.name}</span>'
+        )
 
 
 @admin.register(Ingredient)
@@ -69,20 +77,12 @@ class IngredientAdmin(admin.ModelAdmin):
         'measurement_unit'
     )
 
-    list_filter = ('name',)
-    list_per_page = LIST_PER_PAGE
+    list_filter = ('measurement_unit',)
     search_fields = ('name',)
 
 
 class RecipeIngredientInline(admin.TabularInline):
-
     model = RecipeIngredient
-    min_num = 1
-
-
-class RecipeTagInLine(admin.TabularInline):
-
-    model = RecipeTag
     min_num = 1
 
 
@@ -97,19 +97,15 @@ class RecipeAdmin(admin.ModelAdmin):
         'cooking_time',
         'image',
         'pub_date',
-        'count_favorite',
     )
+
     inlines = [
         RecipeIngredientInline,
-        RecipeTagInLine,
     ]
 
     list_filter = ('author', 'name', 'tags')
     list_per_page = LIST_PER_PAGE
     search_fields = ('author', 'name')
-
-    def count_favorite(self, object):
-        return object.favourites.count()
 
 
 @admin.register(RecipeIngredient)
@@ -119,9 +115,14 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
         'pk',
         'ingredient',
         'amount',
-        'recipe'
+        'recipe',
+        'measurement_unit'
     )
     list_per_page = LIST_PER_PAGE
+
+    @admin.display(description='Единица измерения')
+    def measurement_unit(self, instance):
+        return instance.ingredient.measurement_unit
 
 
 @admin.register(Favourite)

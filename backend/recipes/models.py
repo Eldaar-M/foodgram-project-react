@@ -1,3 +1,4 @@
+from colorfield.fields import ColorField
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -63,13 +64,16 @@ class Ingredient(models.Model):
         verbose_name_plural = 'Продукты'
 
     def __str__(self):
-        return self.name
+        return f'{self.name}, {self.measurement_unit}'
 
 
 class Tag(models.Model):
     name = models.CharField('Тег', unique=True, max_length=32)
     slug = models.SlugField(unique=True)
-    color = models.CharField('Цвет', max_length=7)
+    color = ColorField(default='#FF0000',
+                       max_length=7,
+                       unique=True,
+                       verbose_name='Цвет в HEX')
 
     class Meta():
         verbose_name = 'Тег'
@@ -136,19 +140,34 @@ class Recipe(models.Model):
 class RecipeIngredient(models.Model):
     ingredient = models.ForeignKey(
         Ingredient,
+        verbose_name='Продукт',
         on_delete=models.CASCADE,
         related_name='recipe_ingredients'
     )
     recipe = models.ForeignKey(
         Recipe,
+        verbose_name='Рецепт',
         on_delete=models.CASCADE,
         related_name='recipe_ingredients'
     )
     amount = models.PositiveIntegerField(
+        verbose_name='Мера',
         validators=[
             MinValueValidator(
                 MIN_VALUE_VALID,
                 message='Количество продуктов не может быть нулевым')])
+
+    class Meta:
+        verbose_name = 'Продукт в рецепте'
+        verbose_name_plural = 'Продукты в рецепте'
+
+    def ingredients_shopping_cart(self, request):
+        return RecipeIngredient.objects.filter(
+            recipe__shopping_carts__user=request.user).values(
+            'recipe__name',
+            'ingredient__name',
+            'ingredient__measurement_unit'
+        ).order_by('ingredient__name').annotate(total=models.Sum('amount'))
 
 
 class Subscribe(models.Model):
