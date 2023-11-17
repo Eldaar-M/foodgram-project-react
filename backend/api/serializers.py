@@ -104,9 +104,10 @@ class SubscribeUserSerializer(serializers.ModelSerializer):
         recipes_limit = self.context.get(
             'request'
         ).GET.get('recipes_limit', 10**10)
-        if recipes_limit:
-            recipes = user.recipes.all()[:recipes_limit]
-        return GetRecipesSerializer(recipes, many=True).data
+        return GetRecipesSerializer(
+            user.recipes.all()[:int(recipes_limit)],
+            many=True
+        ).data
 
     def get_recipes_count(self, user):
         return user.recipes.count()
@@ -226,32 +227,36 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'cooking_time'
         )
 
+    def validation_for_emptiness(self, recipe):
+        pass
+
     def validate(self, recipe):
-        if not recipe.get('tags'):
-            raise serializers.ValidationError(
-                'Минимальное число тегов: 1'
-            )
-        if not recipe.get('ingredients'):
-            raise serializers.ValidationError(
-                'Минимальное число ингредиентов: 1'
-            )
-        inrgedient_list = [item['id'] for item in recipe.get('ingredients')]
-        unique_ingredientlist = set(inrgedient_list)
-        if len(inrgedient_list) != len(unique_ingredientlist):
-            raise serializers.ValidationError(
-                'Нельзя добавлять один и тот же ингредиент!'
-            )
+        fields = ['tags', 'ingredients']
+        for field in fields:
+            if not recipe.get(field):
+                raise serializers.ValidationError(
+                    f'Выберите хотя-бы один {field}'
+                )
+            if field == 'ingredients':
+                field_list = [item['id'] for item in recipe.get('ingredients')]
+            else:
+                field_list = [item for item in recipe.get('tags')]
+            unique_field_list = set(field_list)
+            if len(field_list) != len(unique_field_list):
+                raise serializers.ValidationError(
+                    f'Нельзя добавлять один и тот же {field}!'
+                )
         return recipe
 
     def add_ingredients(self, ingredients, recipe):
-        RecipeIngredient.objects.bulk_create([
+        RecipeIngredient.objects.bulk_create(
             RecipeIngredient(
                 ingredient=Ingredient.objects.get(id=ingredient['id']),
                 recipe=recipe,
                 amount=ingredient['amount']
             )
             for ingredient in ingredients
-        ])
+        )
 
     def create(self, validated_data):
         author = self.context.get('request').user

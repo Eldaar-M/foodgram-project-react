@@ -15,8 +15,6 @@ from .models import (
 
 User = get_user_model()
 
-LIST_PER_PAGE = 6
-
 
 class UserAdmin(UserAdmin):
     """Класс настройки раздела пользователей."""
@@ -27,24 +25,23 @@ class UserAdmin(UserAdmin):
         'email',
         'first_name',
         'last_name',
-        'password',
         'follower_count',
         'following_count',
         'recipes_count'
     )
-    list_filter = ('username', 'email')
-    list_per_page = LIST_PER_PAGE
+
+    list_per_page = 6
     search_fields = ('username',)
 
-    @admin.display(description='Число подписчиков')
+    @admin.display(description='Подписчики')
     def follower_count(self, user):
         return user.follower.count()
 
-    @admin.display(description='Число подписок')
+    @admin.display(description='Подписки')
     def following_count(self, user):
         return user.following.count()
 
-    @admin.display(description='Число рецептов')
+    @admin.display(description='Рецепты')
     def recipes_count(self, user):
         return user.recipes.count()
 
@@ -62,7 +59,7 @@ class TagAdmin(admin.ModelAdmin):
     @admin.display(description='Предпросмотр')
     def preview(self, tag):
         return mark_safe(
-            f'<span style="color:{tag.color}; '
+            f'<span style="background-color:{tag.color}; '
             f'width=20px; height=20px;">{tag.name}</span>'
         )
 
@@ -94,17 +91,26 @@ class RecipeAdmin(admin.ModelAdmin):
         'author',
         'text',
         'cooking_time',
-        'image',
+        'get_image',
         'pub_date',
+        'in_favorite'
     )
 
     inlines = [
         RecipeIngredientInline,
     ]
 
-    list_filter = ('author', 'name', 'tags')
-    list_per_page = LIST_PER_PAGE
+    list_filter = ('author', 'tags')
+    list_per_page = 6
     search_fields = ('author', 'name')
+
+    @admin.display(description='В избранном')
+    def get_image(self, obj):
+        return mark_safe(f'<img src={obj.image.url} width="50" height="60"')
+
+    @admin.display(description='В избранном')
+    def in_favorite(self, obj):
+        return obj.favourites.all().count()
 
 
 @admin.register(RecipeIngredient)
@@ -117,7 +123,7 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
         'recipe',
         'measurement_unit'
     )
-    list_per_page = LIST_PER_PAGE
+    list_per_page = 6
 
     @admin.display(description='Единица измерения')
     def measurement_unit(self, instance):
@@ -135,7 +141,7 @@ class FavouriteAdmin(admin.ModelAdmin):
 
     list_filter = ('user',)
     search_fields = ('user',)
-    list_per_page = LIST_PER_PAGE
+    list_per_page = 6
 
 
 @admin.register(ShoppingCart)
@@ -149,7 +155,7 @@ class ShoppingCartAdmin(admin.ModelAdmin):
 
     list_filter = ('user',)
     search_fields = ('user',)
-    list_per_page = LIST_PER_PAGE
+    list_per_page = 6
 
 
 admin.site.register(User, UserAdmin)

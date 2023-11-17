@@ -25,7 +25,7 @@ from .serializers import (
     TagSerializer,
     UserSerializer,
 )
-from .send_file import sending
+from .send_file import text_to_print
 from .permissions import AuthorOrReadOnly, AdminOrReadOnly
 from .pagination import Paginator
 from recipes.models import (
@@ -114,11 +114,15 @@ class RecipeViewSet(ModelViewSet):
                               recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(methods=['post', 'delete'], detail=True)
+    @action(methods=['post', 'delete'],
+            permission_classes=(IsAuthenticated,),
+            detail=True)
     def favorite(self, request, pk=None):
         return self.shopping_cart_favorite(Favourite, request, pk)
 
-    @action(methods=['post', 'delete'], detail=True)
+    @action(methods=['post', 'delete'],
+            permission_classes=(IsAuthenticated,),
+            detail=True)
     def shopping_cart(self, request, pk=None):
         return self.shopping_cart_favorite(ShoppingCart, request, pk)
 
@@ -129,7 +133,7 @@ class RecipeViewSet(ModelViewSet):
             request=request
         )
         return FileResponse(
-            sending(ingredients),
+            text_to_print(ingredients),
             content_type='text/plain',
             filename='products.txt'
         )
