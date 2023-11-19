@@ -25,8 +25,8 @@ from .serializers import (
     TagSerializer,
     UserSerializer,
 )
-from .send_file import text_to_print
-from .permissions import AuthorOrReadOnly, AdminOrReadOnly
+from .text_to_print import text_to_print
+from .permissions import AuthorOrReadOnly
 from .pagination import Paginator
 from recipes.models import (
     Favourite,
@@ -44,14 +44,32 @@ User = get_user_model()
 class UserViewSet(UserViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (AdminOrReadOnly,)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+
+    @action(detail=False,
+            methods=['get', 'patch'],
+            url_path='me',
+            permission_classes=(IsAuthenticated,))
+    def get_me(self, request):
+        if request.method == 'PATCH':
+            serializer = UserSerializer(
+                request.user, data=request.data,
+                partial=True, context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = UserSerializer(
+            request.user, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(methods=['get'],
-            detail=False)
+            detail=False,
+            permission_classes=(IsAuthenticated,))
     def subscriptions(self, request):
         paginator = Paginator()
         authors = User.objects.filter(following__user=request.user)
-        # author = request.user.follower.all()
         result_page = paginator.paginate_queryset(authors, request)
         serializer = SubscribeUserSerializer(
             result_page,
@@ -60,7 +78,10 @@ class UserViewSet(UserViewSet):
         )
         return paginator.get_paginated_response(serializer.data)
 
-    @action(methods=['post', 'delete'], detail=True)
+    @action(methods=['post', 'delete'],
+            detail=True,
+            permission_classes=(IsAuthenticated,)
+            )
     def subscribe(self, request, id):
         author = get_object_or_404(User, id=id)
         if request.method == 'POST':
@@ -132,8 +153,9 @@ class RecipeViewSet(ModelViewSet):
             self,
             request=request
         )
+        recipes_list = ShoppingCart.objects.filter(user=request.user.id)
         return FileResponse(
-            text_to_print(ingredients),
+            text_to_print(ingredients, recipes_list),
             content_type='text/plain',
             filename='products.txt'
         )

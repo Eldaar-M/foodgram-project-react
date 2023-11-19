@@ -30,7 +30,6 @@ class UserAdmin(UserAdmin):
         'recipes_count'
     )
 
-    list_per_page = 6
     search_fields = ('username',)
 
     @admin.display(description='Подписчики')
@@ -92,6 +91,8 @@ class RecipeAdmin(admin.ModelAdmin):
         'text',
         'cooking_time',
         'get_image',
+        'get_ingredients',
+        'get_tags',
         'pub_date',
         'in_favorite'
     )
@@ -101,16 +102,31 @@ class RecipeAdmin(admin.ModelAdmin):
     ]
 
     list_filter = ('author', 'tags')
-    list_per_page = 6
     search_fields = ('author', 'name')
 
-    @admin.display(description='В избранном')
-    def get_image(self, obj):
-        return mark_safe(f'<img src={obj.image.url} width="50" height="60"')
+    @admin.display(description='Картинка')
+    def get_image(self, recipe):
+        return mark_safe(f'<img src={recipe.image.url} width="50" height="60"')
+
+    @admin.display(description='Теги')
+    def get_tags(self, recipe):
+        tags = recipe.tags.all()
+        tag_list = ''
+        for tag in tags:
+            tag_list += '{}'.format(''.join(tag.name))
+        return tag_list
+
+    @admin.display(description='Продукты')
+    def get_ingredients(self, recipe):
+        ingredients = recipe.ingredients.all()
+        ingredient_list = ''
+        for ingredient in ingredients:
+            ingredient_list += '{}'.format(''.join(ingredient.name))
+        return ingredient_list
 
     @admin.display(description='В избранном')
-    def in_favorite(self, obj):
-        return obj.favourites.all().count()
+    def in_favorite(self, recipe):
+        return recipe.favourites.all().count()
 
 
 @admin.register(RecipeIngredient)
@@ -123,7 +139,6 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
         'recipe',
         'measurement_unit'
     )
-    list_per_page = 6
 
     @admin.display(description='Единица измерения')
     def measurement_unit(self, instance):
@@ -141,7 +156,6 @@ class FavouriteAdmin(admin.ModelAdmin):
 
     list_filter = ('user',)
     search_fields = ('user',)
-    list_per_page = 6
 
 
 @admin.register(ShoppingCart)
@@ -155,7 +169,6 @@ class ShoppingCartAdmin(admin.ModelAdmin):
 
     list_filter = ('user',)
     search_fields = ('user',)
-    list_per_page = 6
 
 
 admin.site.register(User, UserAdmin)

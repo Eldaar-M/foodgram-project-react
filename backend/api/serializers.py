@@ -1,4 +1,5 @@
 import base64
+from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
@@ -154,12 +155,19 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 
 class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(write_only=True)
-    amount = serializers.IntegerField(write_only=True)
+    id = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all())
 
     class Meta:
         model = RecipeIngredient
         fields = ('id', 'amount')
+
+    def validate_amount(self, value):
+
+        if value < 1:
+            raise serializers.ValidationError(
+                'Количество ингредиента должно быть больше 0!'
+            )
+        return value
 
 
 class RecipeAddSerializer(serializers.ModelSerializer):
@@ -211,7 +219,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         required=True
     )
     ingredients = RecipeIngredientCreateSerializer(many=True)
-    image = Base64ImageField(required=False, allow_null=True)
+    image = Base64ImageField(use_url=True, max_length=None)
     author = UserSerializer(read_only=True)
 
     class Meta:
@@ -227,9 +235,6 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'cooking_time'
         )
 
-    def validation_for_emptiness(self, recipe):
-        pass
-
     def validate(self, recipe):
         fields = ['tags', 'ingredients']
         for field in fields:
@@ -238,20 +243,30 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                     f'Выберите хотя-бы один {field}'
                 )
             if field == 'ingredients':
-                field_list = [item['id'] for item in recipe.get('ingredients')]
+                field_list = [
+                    item['id'].id for item in recipe.get('ingredients')
+                ]
+                repeated_elements = [
+                    Ingredient.objects.get(
+                        id=id).name for id, count in Counter(
+                        field_list).items() if count > 1
+                ]
             else:
-                field_list = [item for item in recipe.get('tags')]
-            unique_field_list = set(field_list)
-            if len(field_list) != len(unique_field_list):
+                field_list = recipe.get('tags')
+                repeated_elements = [
+                    item.name for item, count in Counter(
+                        field_list).items() if count > 1
+                ]
+            if repeated_elements:
                 raise serializers.ValidationError(
-                    f'Нельзя добавлять один и тот же {field}!'
+                    f"Недопустимы повторяющиеся элементы:{repeated_elements}"
                 )
         return recipe
 
     def add_ingredients(self, ingredients, recipe):
         RecipeIngredient.objects.bulk_create(
             RecipeIngredient(
-                ingredient=Ingredient.objects.get(id=ingredient['id']),
+                ingredient=Ingredient.objects.get(id=ingredient['id'].id),
                 recipe=recipe,
                 amount=ingredient['amount']
             )
@@ -276,6 +291,13 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         instance.tags.set(tags)
         super().update(instance, validated_data)
         return instance
+
+    def to_representation(self, instance):
+        request = self.context.get('request')
+        return RecipeSerializer(
+            instance,
+            context={'request': request}
+        ).data
 
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
