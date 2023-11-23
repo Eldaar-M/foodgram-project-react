@@ -148,7 +148,7 @@ class RecipeViewSet(ModelViewSet):
         recipes = ShoppingCart.objects.filter(
             user=request.user.id).values_list(
                 'recipe__name',
-                flat=True).distinct('recipe__name')
+                flat=True).order_by('recipe__name').distinct()
         return FileResponse(
             text_to_print(ingredients, recipes),
             content_type='text/plain',
