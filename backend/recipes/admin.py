@@ -16,6 +16,7 @@ from .models import (
 User = get_user_model()
 
 
+@admin.register(User)
 class UserAdmin(UserAdmin):
     """Класс настройки раздела пользователей."""
 
@@ -88,7 +89,6 @@ class RecipeAdmin(admin.ModelAdmin):
         'pk',
         'name',
         'author',
-        'text',
         'cooking_time',
         'get_image',
         'get_ingredients',
@@ -111,18 +111,21 @@ class RecipeAdmin(admin.ModelAdmin):
     @admin.display(description='Теги')
     def get_tags(self, recipe):
         tags = recipe.tags.all()
-        tag_list = ''
-        for tag in tags:
-            tag_list += '{}'.format(''.join(tag.name))
-        return tag_list
+        return mark_safe("<br>".join([tag.name for tag in tags]))
 
     @admin.display(description='Продукты')
     def get_ingredients(self, recipe):
-        ingredients = recipe.ingredients.all()
-        ingredient_list = ''
-        for ingredient in ingredients:
-            ingredient_list += '{}'.format(''.join(ingredient.name))
-        return ingredient_list
+        recipe_ingredients = RecipeIngredient.objects.select_related(
+            'ingredient'
+        ).filter(recipe=recipe)
+        return mark_safe(
+            "<br>".join(
+                [
+                    f'{recipe_ingredient.ingredient.name} -'
+                    f' {recipe_ingredient.amount}'
+                    f' ({recipe_ingredient.ingredient.measurement_unit})'
+                    for recipe_ingredient in recipe_ingredients
+                ]))
 
     @admin.display(description='В избранном')
     def in_favorite(self, recipe):
@@ -171,5 +174,4 @@ class ShoppingCartAdmin(admin.ModelAdmin):
     search_fields = ('user',)
 
 
-admin.site.register(User, UserAdmin)
 admin.site.unregister(Group)

@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -13,7 +17,8 @@ SECRET_KEY = os.getenv('SECRET_KEY', default='SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 
-DEBUG = True
+DEBUG = DB_PROD = os.getenv('DEBUG', default=False) == 'True'
+
 
 ALLOWED_HOSTS = os.getenv(
     'ALLOWED_HOSTS',
@@ -24,6 +29,7 @@ ALLOWED_HOSTS = os.getenv(
 # Application definition
 
 INSTALLED_APPS = [
+    'dotenv',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -72,16 +78,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'foodgram_backend.wsgi.application'
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('POSTGRES_ENGINE'),
-        'NAME': os.getenv('POSTGRES_DB', 'foodgram'),
-        'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', 5432)
+DB_PROD = os.getenv('DB_PROD', default=False) == 'True'
+if not DB_PROD:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': os.getenv('POSTGRES_ENGINE'),
+            'NAME': os.getenv('POSTGRES_DB', 'foodgram'),
+            'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', ''),
+            'PORT': os.getenv('DB_PORT', 5432)
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -158,4 +173,4 @@ DJOSER = {
 }
 
 
-CSV_FILES_DIR = 'data'
+IMPORT_FILES_DIR = 'data'

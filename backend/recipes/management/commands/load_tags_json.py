@@ -2,6 +2,7 @@ import json
 
 from django.core.management.base import BaseCommand
 
+from foodgram_backend.settings import IMPORT_FILES_DIR
 from recipes.models import Tag
 
 
@@ -10,10 +11,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         with open(
-                '{CSV_FILES_DIR}/tags.json', 'r',
+                f'{IMPORT_FILES_DIR}/tags.json', 'r',
                 encoding='UTF-8'
-        ) as ingredients:
-            ingredient_data = json.loads(ingredients.read())
-            for ingredients in ingredient_data:
-                Tag.objects.get_or_create(**ingredients)
+        ) as file:
+            reader = json.loads(file.read())
+            Tag.objects.bulk_create([
+                Tag(
+                    name=row['name'],
+                    slug=row['slug'],
+                    color=row['color'],
+                )
+                for row in reader
+            ])
         self.stdout.write(self.style.SUCCESS('Данные загружены'))

@@ -256,3 +256,9 @@ class ShoppingCart(UserRecipeModel):
         verbose_name = 'Список покупок'
         verbose_name_plural = 'Списки покупок'
         default_related_name = 'shopping_carts'
+
+    def __str__(self):
+        return self.FAVOURITE_PHRASE.format(
+            user=self.user.username,
+            author=self.recipe.name
+        )

@@ -46,23 +46,10 @@ class UserViewSet(UserViewSet):
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
-    @action(detail=False,
-            methods=['get', 'patch'],
-            url_path='me',
-            permission_classes=(IsAuthenticated,))
-    def get_me(self, request):
-        if request.method == 'PATCH':
-            serializer = UserSerializer(
-                request.user, data=request.data,
-                partial=True, context={'request': request}
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        serializer = UserSerializer(
-            request.user, context={'request': request}
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    def get_permissions(self):
+        if self.action == 'me':
+            self.permission_classes = [IsAuthenticated]
+        return super().get_permissions()
 
     @action(methods=['get'],
             detail=False,
@@ -124,10 +111,15 @@ class RecipeViewSet(ModelViewSet):
         recipe = get_object_or_404(Recipe, pk=pk)
         if request.method == 'POST':
             serializer = RecipeAddSerializer(recipe)
-            model.objects.get_or_create(user=request.user, recipe=recipe)
+            _, created = model.objects.get_or_create(user=request.user,
+                                                     recipe=recipe)
+            if created:
+                code = status.HTTP_201_CREATED
+            else:
+                code = status.HTTP_400_BAD_REQUEST
             return Response(
                 serializer.data,
-                status=status.HTTP_201_CREATED
+                status=code
             )
         if request.method == 'DELETE':
             get_object_or_404(model,
@@ -153,9 +145,12 @@ class RecipeViewSet(ModelViewSet):
             self,
             request=request
         )
-        recipes_list = ShoppingCart.objects.filter(user=request.user.id)
+        recipes = ShoppingCart.objects.filter(
+            user=request.user.id).values_list(
+                'recipe__name',
+                flat=True).distinct('recipe__name')
         return FileResponse(
-            text_to_print(ingredients, recipes_list),
+            text_to_print(ingredients, recipes),
             content_type='text/plain',
             filename='products.txt'
         )

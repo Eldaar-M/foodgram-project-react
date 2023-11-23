@@ -130,7 +130,7 @@ class UserSerializer(UserSerializer):
 
     def get_is_subscribed(self, user):
         request = self.context.get('request')
-        if request.user.is_anonymous:
+        if request is None or request.user.is_anonymous:
             return False
         return user.following.filter(user=request.user).exists()
 
@@ -161,13 +161,13 @@ class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
         model = RecipeIngredient
         fields = ('id', 'amount')
 
-    def validate_amount(self, value):
+    def validate_amount(self, amount):
 
-        if value < 1:
+        if amount < 1:
             raise serializers.ValidationError(
                 'Количество ингредиента должно быть больше 0!'
             )
-        return value
+        return amount
 
 
 class RecipeAddSerializer(serializers.ModelSerializer):
@@ -199,17 +199,21 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('author',)
 
-    def get_is_favorited(self, recipe):
+    def field_validate(self, recipe, related_field):
         request = self.context.get('request')
-        if request.user.is_anonymous:
+        if request is None or request.user.is_anonymous:
             return False
-        return request.user.favourites.filter(recipe=recipe).exists()
+        elif related_field == 'is_favorited':
+            return request.user.favourites.filter(recipe=recipe).exists()
+        return request.user.shopping_carts.filter(recipe=recipe).exists()
+
+    def get_is_favorited(self, recipe):
+        related_field = 'is_favorited'
+        return self.field_validate(recipe, related_field)
 
     def get_is_in_shopping_cart(self, recipe):
-        request = self.context.get('request')
-        if request.user.is_anonymous:
-            return False
-        return request.user.shopping_carts.filter(recipe=recipe).exists()
+        related_field = 'is_in_shopping_cart'
+        return self.field_validate(recipe, related_field)
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -236,30 +240,34 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, recipe):
-        fields = ['tags', 'ingredients']
-        for field in fields:
+        fields = {
+            'ingredients': 'ингредиент',
+            'tags': 'тег'
+        }
+        for field, value in fields.items():
             if not recipe.get(field):
                 raise serializers.ValidationError(
-                    f'Выберите хотя-бы один {field}'
+                    f'Выберите хотя-бы один {value}'
                 )
             if field == 'ingredients':
                 field_list = [
                     item['id'].id for item in recipe.get('ingredients')
                 ]
-                repeated_elements = [
-                    Ingredient.objects.get(
-                        id=id).name for id, count in Counter(
-                        field_list).items() if count > 1
-                ]
             else:
                 field_list = recipe.get('tags')
-                repeated_elements = [
-                    item.name for item, count in Counter(
-                        field_list).items() if count > 1
-                ]
-            if repeated_elements:
+            items = [
+                item for item, count in Counter(
+                    field_list).items() if count > 1
+            ]
+            if items:
+                if field == 'ingredients':
+                    elements = Ingredient.objects.filter(id__in=items)
+                else:
+                    elements = items
+                repeated_elements = [element.name for element in elements]
                 raise serializers.ValidationError(
-                    f"Недопустимы повторяющиеся элементы:{repeated_elements}"
+                    (f'Недопустимы повторяющиеся элементы: '
+                     f'{", ".join(repeated_elements)}')
                 )
         return recipe
 
