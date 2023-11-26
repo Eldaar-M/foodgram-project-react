@@ -11,16 +11,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         with open(
-                f'{IMPORT_FILES_DIR}/tags.json', 'r',
-                encoding='UTF-8'
+            f'{IMPORT_FILES_DIR}/tags.json',
+            'r',
+            encoding='UTF-8'
         ) as file:
-            reader = json.loads(file.read())
-            Tag.objects.bulk_create([
-                Tag(
-                    name=row['name'],
-                    slug=row['slug'],
-                    color=row['color'],
-                )
-                for row in reader
-            ])
+            Tag.objects.bulk_create(
+                Tag(**row)
+                for row in json.loads(file.read())
+            )
         self.stdout.write(self.style.SUCCESS('Данные загружены'))

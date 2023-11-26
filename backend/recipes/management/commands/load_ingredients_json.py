@@ -11,15 +11,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         with open(
-                f'{IMPORT_FILES_DIR}/ingredients.json', 'r',
-                encoding='UTF-8'
+            f'{IMPORT_FILES_DIR}/ingredients.json',
+            'r',
+            encoding='UTF-8'
         ) as file:
-            reader = json.loads(file.read())
-            Ingredient.objects.bulk_create([
-                Ingredient(
-                    name=row['name'],
-                    measurement_unit=row['measurement_unit'],
-                )
-                for row in reader
-            ])
+            Ingredient.objects.bulk_create(
+                Ingredient(**row)
+                for row in json.loads(file.read())
+            )
         self.stdout.write(self.style.SUCCESS('Данные загружены'))

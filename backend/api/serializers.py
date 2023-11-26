@@ -199,21 +199,20 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('author',)
 
-    def field_validate(self, recipe, related_field):
+    def field_validate(self, recipe, model):
         request = self.context.get('request')
         if request is None or request.user.is_anonymous:
             return False
-        elif related_field == 'is_favorited':
-            return request.user.favourites.filter(recipe=recipe).exists()
-        return request.user.shopping_carts.filter(recipe=recipe).exists()
+        return model.objects.filter(user=request.user,
+                                    recipe=recipe).exists()
 
     def get_is_favorited(self, recipe):
-        related_field = 'is_favorited'
-        return self.field_validate(recipe, related_field)
+        model = Favourite
+        return self.field_validate(recipe, model)
 
     def get_is_in_shopping_cart(self, recipe):
-        related_field = 'is_in_shopping_cart'
-        return self.field_validate(recipe, related_field)
+        model = ShoppingCart
+        return self.field_validate(recipe, model)
 
 
 class RecipeCreateSerializer(serializers.ModelSerializer):
@@ -239,37 +238,31 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             'cooking_time'
         )
 
-    def validate(self, recipe):
-        fields = {
-            'ingredients': 'ингредиент',
-            'tags': 'тег'
-        }
-        for field, value in fields.items():
-            if not recipe.get(field):
-                raise serializers.ValidationError(
-                    f'Выберите хотя-бы один {value}'
-                )
-            if field == 'ingredients':
-                field_list = [
-                    item['id'].id for item in recipe.get('ingredients')
-                ]
-            else:
-                field_list = recipe.get('tags')
-            items = [
-                item for item, count in Counter(
-                    field_list).items() if count > 1
-            ]
-            if items:
-                if field == 'ingredients':
-                    elements = Ingredient.objects.filter(id__in=items)
-                else:
-                    elements = items
-                repeated_elements = [element.name for element in elements]
-                raise serializers.ValidationError(
-                    (f'Недопустимы повторяющиеся элементы: '
-                     f'{", ".join(repeated_elements)}')
-                )
-        return recipe
+    def fields_validate(self, what_find, what_show):
+        if not what_find:
+            raise serializers.ValidationError(
+                f'Выберите хотя-бы один {what_show}'
+            )
+        items = [
+            item.name for item, count in Counter(
+                what_find).items() if count > 1
+        ]
+        if items:
+            raise serializers.ValidationError(
+                (f'Недопустимы повторяющиеся элементы: '
+                    f'{", ".join(items)}')
+            )
+
+    def validate_tags(self, tags):
+        self.fields_validate(tags, 'тег')
+        return tags
+
+    def validate_ingredients(self, ingredients):
+        ingredients_unpacked = [
+            ingredient['id'] for ingredient in ingredients
+        ]
+        self.fields_validate(ingredients_unpacked, 'ингредиент')
+        return ingredients
 
     def add_ingredients(self, ingredients, recipe):
         RecipeIngredient.objects.bulk_create(
